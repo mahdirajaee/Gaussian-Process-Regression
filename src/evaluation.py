@@ -1,38 +1,57 @@
 import numpy as np
-from covariance_matrix import compute_covariance_matrix
+import matplotlib.pyplot as plt
 from generate_synthetic import generate_synthetic_data
+from covariance_matrix import compute_covariance_matrix
+from gp_regression import select_training_points, gaussian_process_regression
+from lls_regression import linear_least_squares
 
-def select_training_points(t, y, M=10):
-    """ Randomly select M training points and one test point t_star """
-    t_sampled = np.random.choice(t, M, replace=False)
-    t_sampled = np.array(t_sampled, dtype=int)  # Convert to integer indices
-    y_sampled = y[t_sampled]  # Extract sampled y values
+def plot_results(t, y, t_sampled, y_sampled, t_star, y_hat_gp, sigma, y_hat_lls, y_true):
+    """ Plot realization, GP regression, and LLS regression """
+    plt.figure(figsize=(10, 6))
 
-    # Select a new test point t_star (not in the sampled set)
-    t_rem = np.setdiff1d(t, t_sampled)  # Remaining available time points
-    t_star = np.random.choice(t_rem, 1, replace=False)[0]
-    t_star = int(t_star)  # Ensure it's an integer
-    y_true = y[t_star]  # True y value at t_star
+    # Plot full Gaussian Process realization
+    plt.plot(t, y, 'b', alpha=0.7, label="realization")
 
-    return t_sampled, y_sampled, t_star, y_true
+    # Mark sampled points (training data)
+    plt.scatter(t_sampled, y_sampled, color='blue', marker='o', s=60, label="sampled values")
 
-def gaussian_process_regression(t_sampled, y_sampled, t_star, R, sigma_n=0):
-    """ Compute the GP regression estimate y_hat(t_star) """
-    M = len(t_sampled)
-    R_sampled = R[np.ix_(t_sampled, t_sampled)]  # Extract covariance submatrix
-    k_star = R[np.ix_([t_star], t_sampled)].T  # Cross covariance
+    # Mark the true value y(t*)
+    plt.scatter(t_star, y_true, color='red', marker='s', s=80, label="true value")
 
-    # Compute GP estimate
-    y_hat_star = (k_star.T @ np.linalg.inv(R_sampled + sigma_n * np.eye(M)) @ y_sampled).item()
-    sigma = (R[t_star, t_star] - k_star.T @ np.linalg.inv(R_sampled) @ k_star).item()
+    # Mark GP regression prediction ŷ(t*)
+    plt.scatter(t_star, y_hat_gp, color='green', marker='x', s=100, label="GP regression")
 
-    return y_hat_star, np.sqrt(sigma)
+    # Plot confidence interval: ŷ(t*) ± σ
+    plt.plot([t_star, t_star], [y_hat_gp - sigma, y_hat_gp + sigma], color='green', linewidth=2, label="range of GP regression")
+
+    # LLS regression line (black)
+    A = np.vstack([t_sampled, np.ones(len(t_sampled))]).T
+    a, b = np.linalg.lstsq(A, y_sampled, rcond=None)[0]
+    plt.plot(t, a * t + b, color='black', linewidth=1.5, label="LLS regression")
+
+    # Mark LLS prediction ŷ(t*) as '+'
+    plt.scatter(t_star, y_hat_lls, color='black', marker='+', s=100, label="LLS predicted")
+
+    plt.xlabel("t (s)")
+    plt.ylabel("y(t)")
+    plt.legend()
+    plt.grid()
+    plt.title("Gaussian Process Regression vs Linear Least Squares")
+    plt.show()
 
 if __name__ == "__main__":
+    # Generate synthetic data
     t, y, h, t_h = generate_synthetic_data()
     R = compute_covariance_matrix(t)
 
+    # Select training points and one test point
     t_sampled, y_sampled, t_star, y_true = select_training_points(t, y)
 
-    y_hat, sigma = gaussian_process_regression(t_sampled, y_sampled, t_star, R)
-    print(f"True y(t*): {y_true}, Estimated ŷ(t*): {y_hat}, Std Dev: {sigma}")
+    # Compute GP regression estimate
+    y_hat_gp, sigma = gaussian_process_regression(t_sampled, y_sampled, t_star, R)
+
+    # Compute LLS regression estimate
+    y_hat_lls = linear_least_squares(t_sampled, y_sampled, t_star)
+
+    # Plot results
+    plot_results(t, y, t_sampled, y_sampled, t_star, y_hat_gp, sigma, y_hat_lls, y_true)
