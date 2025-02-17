@@ -26,8 +26,6 @@ def plot_impulse_response(t_h, h):
     plt.title('Impulse Response')
     plt.show()
 
-def plot_realization(t, y):
-    """Plots a realization of the Gaussian random process."""
     plt.figure()
     plt.plot(t, y)
     plt.grid()
@@ -36,10 +34,5 @@ def plot_realization(t, y):
     plt.title('Realization of the Gaussian Random Process')
     plt.show()
 
-def main():
-    t, y, t_h, h = generate_synthetic_data()
-    plot_impulse_response(t_h, h)
-    plot_realization(t, y)
-    
 if __name__ == "__main__":
     main()
